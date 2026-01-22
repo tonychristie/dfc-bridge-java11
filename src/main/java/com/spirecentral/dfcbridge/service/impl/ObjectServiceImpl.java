@@ -598,8 +598,8 @@ public class ObjectServiceImpl implements ObjectService {
 
     private boolean hasAttribute(Object dfObject, String attrName) {
         try {
-            invokeReflection(dfObject, "findAttrIndex", new Class<?>[]{String.class}, attrName);
-            return true;
+            return (Boolean) invokeReflection(dfObject, "hasAttr",
+                    new Class<?>[]{String.class}, attrName);
         } catch (Exception e) {
             return false;
         }
@@ -613,11 +613,18 @@ public class ObjectServiceImpl implements ObjectService {
         for (int i = 0; i < attrCount; i++) {
             Object attr = invokeReflection(sysObject, "getAttr", new Class<?>[]{int.class}, i);
             String attrName = (String) invokeReflection(attr, "getName");
+            boolean isRepeating = (Boolean) invokeReflection(attr, "isRepeating");
+            int dataType = (Integer) invokeReflection(attr, "getDataType");
 
             try {
-                Object value = invokeReflection(sysObject, "getValue", new Class<?>[]{String.class}, attrName);
+                Object value;
+                if (isRepeating) {
+                    value = extractRepeatingAttributeValue(sysObject, attrName, dataType);
+                } else {
+                    value = extractSingleAttributeValue(sysObject, attrName, dataType);
+                }
                 if (value != null) {
-                    attributes.put(attrName, value.toString());
+                    attributes.put(attrName, value);
                 }
             } catch (Exception e) {
                 // Skip attributes that can't be read
@@ -625,6 +632,63 @@ public class ObjectServiceImpl implements ObjectService {
         }
 
         return attributes;
+    }
+
+    private Object extractSingleAttributeValue(Object sysObject, String attrName, int dataType) throws Exception {
+        String methodName = getGetterMethodName(dataType);
+        Object value = invokeReflection(sysObject, methodName, new Class<?>[]{String.class}, attrName);
+
+        // Convert IDfTime and IDfId to string for JSON serialization
+        if (value != null && (dataType == 4 || dataType == 5)) { // TIME or ID
+            value = value.toString();
+        }
+
+        return value;
+    }
+
+    private Object extractRepeatingAttributeValue(Object sysObject, String attrName, int dataType) throws Exception {
+        int count = (Integer) invokeReflection(sysObject, "getValueCount", new Class<?>[]{String.class}, attrName);
+        if (count == 0) {
+            return new ArrayList<>();
+        }
+
+        List<Object> values = new ArrayList<>();
+        String methodName = getRepeatingGetterMethodName(dataType);
+
+        for (int i = 0; i < count; i++) {
+            Object value = invokeReflection(sysObject, methodName,
+                    new Class<?>[]{String.class, int.class}, attrName, i);
+            // Convert IDfTime and IDfId to string for JSON serialization
+            if (value != null && (dataType == 4 || dataType == 5)) { // TIME or ID
+                value = value.toString();
+            }
+            values.add(value);
+        }
+        return values;
+    }
+
+    private String getGetterMethodName(int dataType) {
+        switch (dataType) {
+            case 0: return "getBoolean";   // DM_BOOLEAN
+            case 1: return "getInt";       // DM_INTEGER
+            case 2: return "getString";    // DM_STRING
+            case 3: return "getDouble";    // DM_DOUBLE
+            case 4: return "getTime";      // DM_TIME
+            case 5: return "getId";        // DM_ID
+            default: return "getString";
+        }
+    }
+
+    private String getRepeatingGetterMethodName(int dataType) {
+        switch (dataType) {
+            case 0: return "getRepeatingBoolean";   // DM_BOOLEAN
+            case 1: return "getRepeatingInt";       // DM_INTEGER
+            case 2: return "getRepeatingString";    // DM_STRING
+            case 3: return "getRepeatingDouble";    // DM_DOUBLE
+            case 4: return "getRepeatingTime";      // DM_TIME
+            case 5: return "getRepeatingId";        // DM_ID
+            default: return "getRepeatingString";
+        }
     }
 
     private void setObjectAttribute(Object sysObject, String attrName, Object value) throws Exception {
