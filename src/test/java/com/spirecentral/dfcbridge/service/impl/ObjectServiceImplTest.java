@@ -1,5 +1,6 @@
 package com.spirecentral.dfcbridge.service.impl;
 
+import com.spirecentral.dfcbridge.model.AttributeValue;
 import com.spirecentral.dfcbridge.model.ObjectInfo;
 import com.spirecentral.dfcbridge.service.DfcSessionService;
 import org.junit.jupiter.api.BeforeEach;
@@ -211,12 +212,14 @@ class ObjectServiceImplTest {
         assertNotNull(result);
         assertNotNull(result.getAttributes());
 
-        Object versionLabels = result.getAttributes().get("r_version_label");
-        assertNotNull(versionLabels);
-        assertTrue(versionLabels instanceof List);
+        AttributeValue versionLabelsAttr = result.getAttributes().get("r_version_label");
+        assertNotNull(versionLabelsAttr);
+        assertEquals("string", versionLabelsAttr.getType());
+        assertTrue(versionLabelsAttr.isRepeating());
+        assertTrue(versionLabelsAttr.getValue() instanceof List);
 
         @SuppressWarnings("unchecked")
-        List<Object> labels = (List<Object>) versionLabels;
+        List<Object> labels = (List<Object>) versionLabelsAttr.getValue();
         assertEquals(2, labels.size());
         assertEquals("1.0", labels.get(0));
         assertEquals("CURRENT", labels.get(1));
@@ -242,12 +245,14 @@ class ObjectServiceImplTest {
 
         // Assert
         assertNotNull(result);
-        Object keywords = result.getAttributes().get("keywords");
-        assertNotNull(keywords);
-        assertTrue(keywords instanceof List);
+        AttributeValue keywordsAttr = result.getAttributes().get("keywords");
+        assertNotNull(keywordsAttr);
+        assertEquals("string", keywordsAttr.getType());
+        assertTrue(keywordsAttr.isRepeating());
+        assertTrue(keywordsAttr.getValue() instanceof List);
 
         @SuppressWarnings("unchecked")
-        List<Object> keywordList = (List<Object>) keywords;
+        List<Object> keywordList = (List<Object>) keywordsAttr.getValue();
         assertTrue(keywordList.isEmpty());
     }
 
@@ -272,11 +277,19 @@ class ObjectServiceImplTest {
 
         // Assert
         assertNotNull(result);
-        Map<String, Object> attrs = result.getAttributes();
+        Map<String, AttributeValue> attrs = result.getAttributes();
 
-        assertEquals("test.pdf", attrs.get("object_name"));
-        assertEquals(12345, attrs.get("r_content_size"));
-        assertEquals(false, attrs.get("a_is_hidden"));
+        assertEquals("test.pdf", attrs.get("object_name").getValue());
+        assertEquals("string", attrs.get("object_name").getType());
+        assertFalse(attrs.get("object_name").isRepeating());
+
+        assertEquals(12345, attrs.get("r_content_size").getValue());
+        assertEquals("integer", attrs.get("r_content_size").getType());
+        assertFalse(attrs.get("r_content_size").isRepeating());
+
+        assertEquals(false, attrs.get("a_is_hidden").getValue());
+        assertEquals("boolean", attrs.get("a_is_hidden").getType());
+        assertFalse(attrs.get("a_is_hidden").isRepeating());
     }
 
     @Test
@@ -299,12 +312,14 @@ class ObjectServiceImplTest {
 
         // Assert
         assertNotNull(result);
-        Object positions = result.getAttributes().get("i_position");
-        assertNotNull(positions);
-        assertTrue(positions instanceof List);
+        AttributeValue positionsAttr = result.getAttributes().get("i_position");
+        assertNotNull(positionsAttr);
+        assertEquals("integer", positionsAttr.getType());
+        assertTrue(positionsAttr.isRepeating());
+        assertTrue(positionsAttr.getValue() instanceof List);
 
         @SuppressWarnings("unchecked")
-        List<Object> positionList = (List<Object>) positions;
+        List<Object> positionList = (List<Object>) positionsAttr.getValue();
         assertEquals(3, positionList.size());
         assertEquals(0, positionList.get(0));
         assertEquals(1, positionList.get(1));
@@ -334,23 +349,37 @@ class ObjectServiceImplTest {
 
         // Assert
         assertNotNull(result);
-        Map<String, Object> attrs = result.getAttributes();
+        Map<String, AttributeValue> attrs = result.getAttributes();
 
-        // Single values should be scalars
-        assertEquals("report.pdf", attrs.get("object_name"));
-        assertEquals("Annual Report", attrs.get("title"));
-        assertEquals(98765, attrs.get("r_content_size"));
+        // Single values should be scalars with type metadata
+        assertEquals("report.pdf", attrs.get("object_name").getValue());
+        assertEquals("string", attrs.get("object_name").getType());
+        assertFalse(attrs.get("object_name").isRepeating());
 
-        // Repeating values should be lists
+        assertEquals("Annual Report", attrs.get("title").getValue());
+        assertEquals("string", attrs.get("title").getType());
+
+        assertEquals(98765, attrs.get("r_content_size").getValue());
+        assertEquals("integer", attrs.get("r_content_size").getType());
+
+        // Repeating values should be lists with type metadata
+        AttributeValue versionLabelsAttr = attrs.get("r_version_label");
+        assertEquals("string", versionLabelsAttr.getType());
+        assertTrue(versionLabelsAttr.isRepeating());
+
         @SuppressWarnings("unchecked")
-        List<Object> versionLabels = (List<Object>) attrs.get("r_version_label");
+        List<Object> versionLabels = (List<Object>) versionLabelsAttr.getValue();
         assertEquals(3, versionLabels.size());
         assertEquals("1.0", versionLabels.get(0));
         assertEquals("1.1", versionLabels.get(1));
         assertEquals("CURRENT", versionLabels.get(2));
 
+        AttributeValue authorsAttr = attrs.get("authors");
+        assertEquals("string", authorsAttr.getType());
+        assertTrue(authorsAttr.isRepeating());
+
         @SuppressWarnings("unchecked")
-        List<Object> authors = (List<Object>) attrs.get("authors");
+        List<Object> authors = (List<Object>) authorsAttr.getValue();
         assertEquals(2, authors.size());
         assertEquals("John Doe", authors.get(0));
         assertEquals("Jane Smith", authors.get(1));
@@ -673,7 +702,7 @@ class ObjectServiceImplTest {
         /**
          * Add an attribute with values.
          * @param name attribute name
-         * @param dataType 0=BOOLEAN, 1=INTEGER, 2=STRING, 3=DOUBLE, 4=TIME, 5=ID
+         * @param dataType 0=BOOLEAN, 1=INTEGER, 2=STRING, 3=ID, 4=TIME, 5=DOUBLE
          * @param repeating whether the attribute is repeating
          * @param values the values (for repeating, can be multiple; for single, just one)
          */
