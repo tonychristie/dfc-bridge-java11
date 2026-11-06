@@ -686,5 +686,10 @@ class DmApiServiceImplTest {
         public Object getObject(com.documentum.fc.common.IDfId id) {
             return null; // Not used in dmAPI tests
         }
+
+        @Override
+        public boolean isConnected() {
+            return true;
+        }
     }
 }
