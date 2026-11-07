@@ -671,8 +671,8 @@ class DmApiServiceImplTest {
         }
 
         @Override
-        public Object getObject(com.documentum.fc.common.IDfId id) {
-            return null; // Not used in dmAPI tests
+        public Object getObject(com.documentum.fc.common.IDfId objectId) {
+            return null;  // Not used in DmApiServiceImpl tests
         }
 
         @Override

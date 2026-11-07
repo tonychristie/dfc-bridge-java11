@@ -5,162 +5,108 @@ import com.spirecentral.dfcbridge.exception.UserNotFoundException;
 import com.spirecentral.dfcbridge.model.GroupInfo;
 import com.spirecentral.dfcbridge.model.UserInfo;
 import com.spirecentral.dfcbridge.service.UserGroupService;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Unit tests for UserGroupController.
- */
+@WebMvcTest(UserGroupController.class)
 class UserGroupControllerTest {
-
-    private UserGroupService userGroupService;
-    private UserGroupController controller;
 
     private static final String SESSION_ID = "test-session-123";
 
-    @BeforeEach
-    void setUp() {
-        userGroupService = mock(UserGroupService.class);
-        controller = new UserGroupController(userGroupService);
-    }
+    @Autowired
+    private MockMvc mockMvc;
 
-    // ============== User Tests ==============
+    @MockBean
+    private UserGroupService userGroupService;
 
     @Test
-    void listUsers_returnsUserList() {
-        List<UserInfo> users = Arrays.asList(
-                UserInfo.builder().objectId("0b123").userName("user1").build(),
-                UserInfo.builder().objectId("0b456").userName("user2").build()
-        );
-        when(userGroupService.listUsers(SESSION_ID, null)).thenReturn(users);
+    void listUsers_returnsUsersForPattern() throws Exception {
+        when(userGroupService.listUsers(SESSION_ID, "dm*")).thenReturn(List.of(
+                UserInfo.builder().userName("dmadmin").build(),
+                UserInfo.builder().userName("dm_bof_registry").build()));
 
-        ResponseEntity<List<UserInfo>> response = controller.listUsers(SESSION_ID, null);
-
-        assertEquals(200, response.getStatusCode().value());
-        assertEquals(2, response.getBody().size());
-        assertEquals("user1", response.getBody().get(0).getUserName());
+        mockMvc.perform(get("/api/v1/users").param("sessionId", SESSION_ID).param("pattern", "dm*"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].userName").value("dmadmin"))
+                .andExpect(jsonPath("$[1].userName").value("dm_bof_registry"));
     }
 
     @Test
-    void listUsers_withPattern_passesPatternToService() {
-        when(userGroupService.listUsers(SESSION_ID, "admin*")).thenReturn(Collections.emptyList());
+    void getUser_returnsUser() throws Exception {
+        when(userGroupService.getUser(SESSION_ID, "dmadmin")).thenReturn(
+                UserInfo.builder().userName("dmadmin").superUser(true).build());
 
-        controller.listUsers(SESSION_ID, "admin*");
-
-        verify(userGroupService).listUsers(SESSION_ID, "admin*");
+        mockMvc.perform(get("/api/v1/users/dmadmin").param("sessionId", SESSION_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userName").value("dmadmin"))
+                .andExpect(jsonPath("$.superUser").value(true));
     }
 
     @Test
-    void getUser_returnsUserInfo() {
-        UserInfo user = UserInfo.builder()
-                .objectId("0b123")
-                .userName("dmadmin")
-                .userOsName("dmadmin")
-                .userState("0")
-                .superUser(true)
-                .build();
-        when(userGroupService.getUser(SESSION_ID, "dmadmin")).thenReturn(user);
+    void getUser_notFound_returns404() throws Exception {
+        when(userGroupService.getUser(SESSION_ID, "nouser")).thenThrow(new UserNotFoundException("nouser"));
 
-        ResponseEntity<UserInfo> response = controller.getUser("dmadmin", SESSION_ID);
-
-        assertEquals(200, response.getStatusCode().value());
-        assertEquals("dmadmin", response.getBody().getUserName());
-        assertTrue(response.getBody().isSuperUser());
+        mockMvc.perform(get("/api/v1/users/nouser").param("sessionId", SESSION_ID))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("USER_NOT_FOUND"));
     }
 
     @Test
-    void getUser_notFound_throwsUserNotFoundException() {
-        when(userGroupService.getUser(SESSION_ID, "nonexistent"))
-                .thenThrow(new UserNotFoundException("nonexistent"));
+    void listGroups_returnsGroupsForPattern() throws Exception {
+        when(userGroupService.listGroups(SESSION_ID, "dm_*")).thenReturn(List.of(
+                GroupInfo.builder().groupName("dm_browse_all").build(),
+                GroupInfo.builder().groupName("dm_superusers").build()));
 
-        assertThrows(UserNotFoundException.class,
-                () -> controller.getUser("nonexistent", SESSION_ID));
-    }
-
-    // ============== Group Tests ==============
-
-    @Test
-    void listGroups_returnsGroupList() {
-        List<GroupInfo> groups = Arrays.asList(
-                GroupInfo.builder().objectId("0c123").groupName("group1").build(),
-                GroupInfo.builder().objectId("0c456").groupName("group2").build()
-        );
-        when(userGroupService.listGroups(SESSION_ID, null)).thenReturn(groups);
-
-        ResponseEntity<List<GroupInfo>> response = controller.listGroups(SESSION_ID, null);
-
-        assertEquals(200, response.getStatusCode().value());
-        assertEquals(2, response.getBody().size());
-        assertEquals("group1", response.getBody().get(0).getGroupName());
+        mockMvc.perform(get("/api/v1/groups").param("sessionId", SESSION_ID).param("pattern", "dm_*"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].groupName").value("dm_browse_all"))
+                .andExpect(jsonPath("$[1].groupName").value("dm_superusers"));
     }
 
     @Test
-    void listGroups_withPattern_passesPatternToService() {
-        when(userGroupService.listGroups(SESSION_ID, "dm_*")).thenReturn(Collections.emptyList());
-
-        controller.listGroups(SESSION_ID, "dm_*");
-
-        verify(userGroupService).listGroups(SESSION_ID, "dm_*");
-    }
-
-    @Test
-    void getGroup_returnsGroupInfoWithMembers() {
-        GroupInfo group = GroupInfo.builder()
-                .objectId("0c123")
+    void getGroup_returnsGroupWithMembers() throws Exception {
+        when(userGroupService.getGroup(SESSION_ID, "docu")).thenReturn(GroupInfo.builder()
                 .groupName("docu")
-                .description("Documentation group")
-                .usersNames(Arrays.asList("user1", "user2", "user3"))
-                .groupsNames(Collections.emptyList())
-                .build();
-        when(userGroupService.getGroup(SESSION_ID, "docu")).thenReturn(group);
+                .usersNames(List.of("test01", "test02"))
+                .groupsNames(List.of("admingroup"))
+                .build());
 
-        ResponseEntity<GroupInfo> response = controller.getGroup("docu", SESSION_ID);
-
-        assertEquals(200, response.getStatusCode().value());
-        assertEquals("docu", response.getBody().getGroupName());
-        assertEquals(3, response.getBody().getUsersNames().size());
+        mockMvc.perform(get("/api/v1/groups/docu").param("sessionId", SESSION_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groupName").value("docu"))
+                .andExpect(jsonPath("$.usersNames[1]").value("test02"))
+                .andExpect(jsonPath("$.groupsNames[0]").value("admingroup"));
     }
 
     @Test
-    void getGroup_notFound_throwsGroupNotFoundException() {
-        when(userGroupService.getGroup(SESSION_ID, "nonexistent"))
-                .thenThrow(new GroupNotFoundException("nonexistent"));
+    void getGroup_notFound_returns404() throws Exception {
+        when(userGroupService.getGroup(SESSION_ID, "nogroup")).thenThrow(new GroupNotFoundException("nogroup"));
 
-        assertThrows(GroupNotFoundException.class,
-                () -> controller.getGroup("nonexistent", SESSION_ID));
-    }
-
-    // ============== User Groups Tests ==============
-
-    @Test
-    void getGroupsForUser_returnsGroupList() {
-        List<GroupInfo> groups = Arrays.asList(
-                GroupInfo.builder().objectId("0c123").groupName("group1").build(),
-                GroupInfo.builder().objectId("0c456").groupName("group2").build()
-        );
-        when(userGroupService.getGroupsForUser(SESSION_ID, "user1")).thenReturn(groups);
-
-        ResponseEntity<List<GroupInfo>> response = controller.getGroupsForUser("user1", SESSION_ID);
-
-        assertEquals(200, response.getStatusCode().value());
-        assertEquals(2, response.getBody().size());
+        mockMvc.perform(get("/api/v1/groups/nogroup").param("sessionId", SESSION_ID))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("GROUP_NOT_FOUND"));
     }
 
     @Test
-    void getGroupsForUser_noGroups_returnsEmptyList() {
-        when(userGroupService.getGroupsForUser(SESSION_ID, "lonely")).thenReturn(Collections.emptyList());
+    void getGroupsForUser_returnsGroups() throws Exception {
+        when(userGroupService.getGroupsForUser(SESSION_ID, "test01")).thenReturn(List.of(
+                GroupInfo.builder().groupName("docu").build()));
 
-        ResponseEntity<List<GroupInfo>> response = controller.getGroupsForUser("lonely", SESSION_ID);
-
-        assertEquals(200, response.getStatusCode().value());
-        assertTrue(response.getBody().isEmpty());
+        mockMvc.perform(get("/api/v1/users/test01/groups").param("sessionId", SESSION_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].groupName").value("docu"));
     }
 }
