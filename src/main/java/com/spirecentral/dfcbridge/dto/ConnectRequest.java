@@ -19,11 +19,13 @@ import io.swagger.v3.oas.annotations.media.Schema;
 @Schema(description = "Request to establish a Documentum session")
 public class ConnectRequest {
 
-    @Schema(description = "Docbroker hostname for DFC connection", example = "docbroker.example.com")
+    @Schema(description = "Docbroker host. The session connects to the repository in the environment of this docbroker",
+            example = "docbroker.example.com")
     private String docbroker;
 
     @Positive(message = "Port must be a positive number")
-    @Schema(description = "Docbroker port for DFC connection", example = "1489", defaultValue = "1489")
+    @Schema(description = "Docbroker port. Together with the docbroker host, it chooses the environment the session connects to",
+            example = "1489", defaultValue = "1489")
     @Builder.Default
     private int port = 1489;
 
@@ -38,9 +40,6 @@ public class ConnectRequest {
     @NotBlank(message = "Password is required")
     @Schema(description = "Password for authentication")
     private String password;
-
-    @Schema(description = "DFC profile to use (optional)", example = "default")
-    private String dfcProfile;
 
     @Schema(description = "Domain for authentication (optional)")
     private String domain;
